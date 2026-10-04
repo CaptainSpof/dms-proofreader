@@ -27,7 +27,7 @@ rename it.
 - **The editor is rich text; LanguageTool sees its plain projection.**
   Document positions map 1:1 onto `getText()`, but Qt returns `<br>` as U+2028
   and paragraph breaks as U+2029: normalise both to `\n` before checking,
-  translating or copying. Write them as ` ` escapes — a raw U+2028 in a
+  translating or copying. Write them as `\u2028` escapes — a raw U+2028 in a
   QML regex is a line terminator and breaks the parse.
 - **LanguageTool offsets are UTF-16 code units**, like QML strings. Never
   convert them.
