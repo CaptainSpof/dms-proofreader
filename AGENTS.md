@@ -38,6 +38,9 @@ rename it.
   "hte" passes); only their variants do. They are filtered out of the language
   menu and migrated in saved state. Other bare codes checked spelling when
   surveyed.
+- **LanguageTool lists some languages twice under one name** ("French" is
+  both `fr` and `fr-FR`). The menu keeps one entry per name — the pinned one,
+  else the shortest code — because DankDropdown keys options by label.
 - `TextArea.copy()` needs a real input event on Wayland: from IPC it silently
   does nothing, hence the `wl-paste --list-types` check and plain-text fallback.
 - nixpkgs' `translatelocally` is overridden with `-Wno-error=array-bounds`

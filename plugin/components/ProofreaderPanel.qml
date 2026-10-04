@@ -166,12 +166,9 @@ Item {
                 dropdownWidth: 200
                 enableFuzzySearch: true
                 options: ["Auto (détection)"].concat(panel.ctl.languageList.map(l => l.name))
-                currentValue: {
-                    if (panel.ctl.language === "auto")
-                        return "Auto (détection)";
-                    const hit = panel.ctl.languageList.find(l => l.longCode === panel.ctl.language);
-                    return hit ? hit.name : panel.ctl.language;
-                }
+                // Pinned languages carry a pin in the menu (and in the trigger).
+                optionIcons: ["auto_awesome"].concat(panel.ctl.languageList.map(l => panel.ctl.isPinned(l.longCode) ? "push_pin" : ""))
+                currentValue: panel.ctl.language === "auto" ? "Auto (détection)" : panel.ctl.languageName(panel.ctl.language)
                 onValueChanged: value => {
                     if (value === "Auto (détection)") {
                         panel.ctl.language = "auto";
@@ -181,6 +178,16 @@ Item {
                     if (hit)
                         panel.ctl.language = hit.longCode;
                 }
+            }
+
+            DankActionButton {
+                readonly property bool pinned: panel.ctl.isPinned(panel.ctl.language)
+                visible: panel.ctl.language !== "auto"
+                iconName: "push_pin"
+                iconFilled: pinned
+                iconColor: pinned ? Theme.primary : Theme.surfaceVariantText
+                tooltipText: pinned ? "Désépingler cette langue" : "Épingler cette langue en haut de la liste"
+                onClicked: panel.ctl.togglePin(panel.ctl.language)
             }
 
             Item {

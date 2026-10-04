@@ -21,6 +21,14 @@ PluginSettings {
         placeholder: "dms-translate"
     }
 
+    StringSetting {
+        settingKey: "pinnedLanguages"
+        label: "Langues épinglées"
+        description: "Codes LanguageTool séparés par des virgules, affichés en tête du menu dans cet ordre. Le bouton épingle à côté du menu modifie la même liste."
+        placeholder: "fr, en-US, en-GB"
+        defaultValue: "fr, en-US, en-GB"
+    }
+
     ToggleSetting {
         settingKey: "autoCheck"
         label: "Vérification automatique"

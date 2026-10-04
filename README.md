@@ -8,8 +8,9 @@ style, and translates offline.
   (LGPL, self-hostable). Errors are underlined in place, colour-coded by kind;
   a click applies a suggestion. Misspellings can be ignored or added to a
   personal dictionary.
-- **Language** is detected automatically, or picked from the server's list
-  (French and English first).
+- **Language** is detected automatically, or picked from the server's list.
+  Pinned languages head the menu: pin the current one with the pin button, or
+  list codes in the plugin settings (default `fr, en-US, en-GB`).
 - **Translation** is offline, through
   [translateLocally](https://translatelocally.com) (Bergamot, the engine behind
   Firefox Translations). Pairs without a model of their own are chained through

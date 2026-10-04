@@ -263,7 +263,50 @@ PluginComponent {
         xhr.send();
     }
 
-    readonly property var languageList: (languages.length > 0 ? languages : fallbackLanguages).slice().sort((a, b) => languageRank(a.longCode) - languageRank(b.longCode) || a.name.localeCompare(b.name))
+    // ── pinned languages ─────────────────────────────────────────────────
+    // Pinned codes head the language menu, in pin order. Stored as a comma
+    // list in the plugin settings, so the settings field and the pin button
+    // next to the menu edit the same value.
+    readonly property string defaultPinnedLanguages: "fr, en-US, en-GB"
+    readonly property var pinnedLanguages: {
+        const raw = pluginData.pinnedLanguages;
+        const value = typeof raw === "string" ? raw : defaultPinnedLanguages;
+        return value.split(",").map(c => c.trim()).filter(c => c.length > 0);
+    }
+
+    function isPinned(code) {
+        return pinnedLanguages.indexOf(code) >= 0;
+    }
+
+    function togglePin(code) {
+        if (!code || code === "auto" || !pluginService)
+            return;
+        const list = isPinned(code) ? pinnedLanguages.filter(c => c !== code) : pinnedLanguages.concat([code]);
+        pluginService.savePluginData("proofreader", "pinnedLanguages", list.join(", "));
+    }
+
+    // LanguageTool lists some languages twice under one name ("French" is both
+    // fr and fr-FR). Keep one per name: the pinned one, else the shortest code.
+    readonly property var languageList: {
+        const byName = {};
+        (languages.length > 0 ? languages : fallbackLanguages).forEach(l => {
+            const kept = byName[l.name];
+            const better = !kept || (isPinned(l.longCode) && !isPinned(kept.longCode)) || (isPinned(l.longCode) === isPinned(kept.longCode) && l.longCode.length < kept.longCode.length);
+            if (better)
+                byName[l.name] = l;
+        });
+        const pinRank = l => {
+            const i = pinnedLanguages.indexOf(l.longCode);
+            return i < 0 ? pinnedLanguages.length : i;
+        };
+        return Object.values(byName).sort((a, b) => pinRank(a) - pinRank(b) || a.name.localeCompare(b.name));
+    }
+
+    // Display name for a code, including codes folded into a same-named entry.
+    function languageName(code) {
+        const hit = languageList.find(l => l.longCode === code) || languages.find(l => l.longCode === code);
+        return hit ? hit.name : code;
+    }
 
     function filterIgnored(list, source) {
         if (ignoredWords.length === 0)
