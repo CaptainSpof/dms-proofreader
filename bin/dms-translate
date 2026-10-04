@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Offline translation for the DMS proofreader plugin, on top of translateLocally
+# (Bergamot). Uses whichever models translateLocally can see: the ones it
+# downloaded itself, or the ones a Nix package puts on XDG_DATA_DIRS.
+#
+#   dms-translate SRC DST [TEXT]   translate TEXT (stdin when omitted)
+#   dms-translate --pairs          reachable pairs as JSON: {"fr": ["en", ...]}
+#
+# Bergamot models mostly go to or from English, so a pair without a model of
+# its own is chained through English. Exit 2 means no model covers the pair.
+set -euo pipefail
+
+tl=${DMS_TRANSLATE_BIN:-translateLocally}
+# translateLocally is a Qt app; keep it off the display and in a UTF-8 locale.
+export QT_QPA_PLATFORM=offscreen LC_ALL=C.UTF-8
+
+# pair ("fr-en") -> model code ("fr-en-tiny"). Base models win over tiny ones.
+declare -A model=()
+while read -r code; do
+  [ -n "$code" ] || continue
+  IFS=- read -r src dst size <<<"$code"
+  pair="$src-$dst"
+  if [ -z "${model[$pair]:-}" ] || [ "$size" = base ]; then
+    model[$pair]=$code
+  fi
+done < <("$tl" --list-models 2>/dev/null | sed -n 's/.*To invoke do -m \([^ ]*\).*/\1/p')
+
+reachable() {
+  [ "$1" != "$2" ] && { [ -n "${model[$1-$2]:-}" ] || { [ -n "${model[$1-en]:-}" ] && [ -n "${model[en-$2]:-}" ]; }; }
+}
+
+if [ "${1:-}" = --pairs ]; then
+  langs=()
+  for pair in "${!model[@]}"; do langs+=("${pair%-*}" "${pair#*-}"); done
+  mapfile -t langs < <(printf '%s\n' "${langs[@]}" | sort -u)
+  out="{" sep=""
+  for src in "${langs[@]}"; do
+    dsts="" dsep=""
+    for dst in "${langs[@]}"; do
+      if reachable "$src" "$dst"; then dsts+="$dsep\"$dst\"" dsep=","; fi
+    done
+    if [ -n "$dsts" ]; then out+="$sep\"$src\":[$dsts]" sep=","; fi
+  done
+  printf '%s}\n' "$out"
+  exit 0
+fi
+
+if [ $# -lt 2 ]; then
+  echo "usage: dms-translate SRC DST [TEXT] | dms-translate --pairs" >&2
+  exit 64
+fi
+
+src=$1 dst=$2
+shift 2
+if [ $# -gt 0 ]; then text=$1; else text=$(cat); fi
+
+run() { "$tl" -m "$1" 2>/dev/null; }
+
+if [ -n "${model[$src-$dst]:-}" ]; then
+  printf '%s\n' "$text" | run "${model[$src-$dst]}"
+elif [ -n "${model[$src-en]:-}" ] && [ -n "${model[en-$dst]:-}" ]; then
+  printf '%s\n' "$text" | run "${model[$src-en]}" | run "${model[en-$dst]}"
+else
+  echo "no translation model for $src -> $dst" >&2
+  exit 2
+fi

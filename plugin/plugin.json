@@ -1,0 +1,14 @@
+{
+	"id": "proofreader",
+	"name": "Correcteur",
+	"description": "Scratch text area with LanguageTool spelling/grammar checks and offline Bergamot translation",
+	"version": "1.0.0",
+	"author": "CaptainSpof",
+	"icon": "spellcheck",
+	"type": "widget",
+	"capabilities": ["dankbar-widget"],
+	"component": "./ProofreaderWidget.qml",
+	"settings": "./ProofreaderSettings.qml",
+	"permissions": ["settings_read", "settings_write"],
+	"requires_dms": ">=1.7.0"
+}
