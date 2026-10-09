@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import qs.Common
 import qs.Services
 import qs.Widgets
+import qs.DCommon.Widgets as DCommon
 
 // Slideout body. All state and the LanguageTool/translation calls live on the
 // widget (`ctl`); this file only lays them out and drives the text area.
@@ -298,7 +299,8 @@ Item {
 
             Flickable {
                 anchors.fill: parent
-                anchors.margins: 1
+                // Clear the 2px focus border so it never covers the first line.
+                anchors.margins: 2
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
                 ScrollBar.vertical: ScrollBar {
@@ -320,7 +322,22 @@ Item {
                     textFormat: TextEdit.RichText
                     persistentSelection: true
                     padding: Theme.spacingM
+                    topPadding: Theme.spacingL
                     background: null
+
+                    // The style's default cursor is red; follow the text
+                    // colour, as the DMS notepad does.
+                    cursorDelegate: DCommon.DTextCursor {
+                        width: 1.5
+                        color: Theme.surfaceText
+                        x: textArea.cursorRectangle.x
+                        y: textArea.cursorRectangle.y
+                        height: textArea.cursorRectangle.height
+                        shown: textArea.cursorVisible
+
+                        readonly property int areaCursorPosition: textArea.cursorPosition
+                        onAreaCursorPositionChanged: resetBlink()
+                    }
 
                     // TextArea's own placeholder does not render under the
                     // DMS style, so draw one.
@@ -485,11 +502,17 @@ Item {
 
                 readonly property string bad: panel.ctl.checkedText.substr(modelData.offset, modelData.length)
                 readonly property bool isSpelling: modelData.rule?.issueType === "misspelling"
+                readonly property bool active: index === panel.ctl.activeIndex
+                readonly property color accent: panel.ctl.issueColor(modelData)
 
                 width: matchList.width - Theme.spacingS
                 height: issueColumn.implicitHeight + Theme.spacingS * 2
                 radius: Theme.cornerRadius
-                color: index === panel.ctl.activeIndex ? Theme.surfaceContainerHighest : Theme.surfaceContainerHigh
+                // The selected issue takes its underline colour so it stands
+                // out from the rest of the list.
+                color: active ? Theme.withAlpha(accent, 0.18) : Theme.surfaceContainerHigh
+                border.width: active ? 2 : 0
+                border.color: accent
 
                 MouseArea {
                     anchors.fill: parent
@@ -504,7 +527,7 @@ Item {
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
                     anchors.margins: Theme.spacingS
-                    color: panel.ctl.issueColor(issue.modelData)
+                    color: issue.accent
                 }
 
                 Column {

@@ -52,7 +52,8 @@ rename it.
 - Link this `plugin/` over `~/.config/DankMaterialShell/plugins/proofreader`
   (restore the Home Manager link before the next switch).
 - Qt caches components: `dms ipc call plugins reload proofreader` after an edit,
-  and restart `dms` after a component failed to load once.
+  and restart `dms` after a component failed to load once. Edits under
+  `components/` are not picked up by the reload either: restart `dms`.
 - `PluginService` caches plugin state in memory on first load; a hand-edited
   `~/.local/state/DankMaterialShell/plugins/proofreader_state.json` only takes
   effect after a DMS restart.
