@@ -88,6 +88,7 @@ and enables the plugin once. Then add the **Correcteur** widget to a bar.
 | ---------------------------- | ------------------------------------- |
 | Open / close                 | the bar widget, or `dms ipc proofreader toggle` |
 | Check now                    | Ctrl+Enter, or `dms ipc proofreader check` |
+| Copy everything              | Ctrl+C with nothing selected (keeps the formatting) |
 | Bold / italic / underline    | Ctrl+B / Ctrl+I / Ctrl+U              |
 | Next list item               | Return or Shift+Return (on an empty item: leave the list) |
 | Window / slideout            | toolbar button, or `dms ipc proofreader popout` / `dock` |

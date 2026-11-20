@@ -604,6 +604,12 @@ Item {
                             event.accepted = true;
                             return;
                         }
+                        // Ctrl+C with nothing selected copies the whole text.
+                        if (event.key === Qt.Key_C && (event.modifiers & Qt.ControlModifier) && textArea.selectionStart === textArea.selectionEnd) {
+                            panel.copyFormatted();
+                            event.accepted = true;
+                            return;
+                        }
                         if (!(event.modifiers & Qt.ControlModifier))
                             return;
                         switch (event.key) {
