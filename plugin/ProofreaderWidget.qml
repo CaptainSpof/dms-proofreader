@@ -181,6 +181,20 @@ PluginComponent {
         return targets.length > 0 ? targets[0] : "";
     }
 
+    // Checks in the current target and translates back into the source. The
+    // target is a bare code; en/de get a variant, since bare ones lack spelling.
+    function swapLanguages() {
+        const src = sourceLanguage;
+        const dst = effectiveTarget;
+        if (!src || !dst)
+            return;
+        const hit = languageList.find(l => baseCode(l.longCode) === dst);
+        language = dst === "en" ? englishVariant : dst === "de" ? "de-DE" : hit ? hit.longCode : dst;
+        targetLanguage = src;
+        saveState("targetLanguage", src);
+        translation = "";
+    }
+
     // ── persistence ──────────────────────────────────────────────────────
     function loadState() {
         if (!pluginService)

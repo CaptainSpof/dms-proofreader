@@ -867,7 +867,15 @@ Item {
 
                 StyledText {
                     color: Theme.surfaceVariantText
-                    text: panel.ctl.sourceLanguage ? panel.ctl.langName(panel.ctl.sourceLanguage) + "  →" : "Langue source inconnue : lancez une vérification"
+                    text: panel.ctl.sourceLanguage ? panel.ctl.langName(panel.ctl.sourceLanguage) : "Langue source inconnue : lancez une vérification"
+                }
+
+                DankActionButton {
+                    visible: panel.ctl.sourceLanguage !== ""
+                    iconName: "arrow_forward"
+                    enabled: panel.ctl.effectiveTarget !== ""
+                    tooltipText: "Inverser les langues"
+                    onClicked: panel.ctl.swapLanguages()
                 }
 
                 DankDropdown {
