@@ -67,6 +67,8 @@ PluginComponent {
     property string language: "auto"
     property string targetLanguage: ""
     property var ignoredWords: []
+    // "slideout" or "window": the pill and IPC reopen the last one used.
+    property string mode: "slideout"
 
     // Matches only describe `checkedText`; once the text moves on, their
     // offsets are stale and the underlines hide until the next check lands.
@@ -191,6 +193,7 @@ PluginComponent {
         language = saved === "en" ? englishVariant : saved === "de" ? "de-DE" : saved;
         targetLanguage = pluginService.loadPluginState("proofreader", "targetLanguage", "");
         ignoredWords = pluginService.loadPluginState("proofreader", "ignoredWords", []);
+        mode = pluginService.loadPluginState("proofreader", "mode", "slideout");
     }
 
     function saveState(key, value) {
@@ -479,6 +482,11 @@ PluginComponent {
     }
 
     function toggleOn(screenName) {
+        const win = windowLoader.item;
+        if (mode === "window" && win) {
+            win.toggle();
+            return;
+        }
         const list = slideouts.instances || [];
         if (list.length === 0)
             return;
@@ -488,6 +496,37 @@ PluginComponent {
                 s.hide();
         });
         target.toggle();
+    }
+
+    function setMode(value) {
+        mode = value;
+        saveState("mode", value);
+    }
+
+    // Detach into a window, as the Notepad's "Open as window".
+    function popOut() {
+        setMode("window");
+        (slideouts.instances || []).forEach(s => {
+            if (s.isVisible)
+                s.hide();
+        });
+        windowLoader.item?.show();
+    }
+
+    // Back into the slideout, on the focused screen.
+    function dock() {
+        setMode("slideout");
+        windowLoader.item?.hide();
+        toggleOn(BarWidgetService.getFocusedScreenName());
+    }
+
+    LazyLoader {
+        id: windowLoader
+        active: root.ipcOwner
+
+        ProofreaderWindow {
+            ctl: root
+        }
     }
 
     // Same frame as the built-in Notepad: full-height slideout, its side,
@@ -510,9 +549,9 @@ PluginComponent {
             content: Component {
                 ProofreaderPanel {
                     ctl: root
-                    // Not `slideout: slideout`: inside the panel that name is its own
-                    // (still unset) property, not this window.
-                    slideout: slideoutWindow
+                    // Not `host: host`-style self references: inside the panel a
+                    // name like that is its own (still unset) property.
+                    host: slideoutWindow
                 }
             }
         }
@@ -530,6 +569,16 @@ PluginComponent {
 
         function check(): string {
             root.runCheck();
+            return "ok";
+        }
+
+        function popout(): string {
+            root.popOut();
+            return "ok";
+        }
+
+        function dock(): string {
+            root.dock();
             return "ok";
         }
     }

@@ -15,10 +15,14 @@ style, and translates offline.
   [translateLocally](https://translatelocally.com) (Bergamot, the engine behind
   Firefox Translations). Pairs without a model of their own are chained through
   English.
-- **Formatting**: bold, italic, underline, strikethrough (Ctrl+B/I/U). Copy puts
+- **Formatting**: bold, italic, underline, strikethrough (Ctrl+B/I/U) and
+  bullet lists. Pasted HTML lists stay lists; pasted plain-text bullets
+  (`- `, `* `, `• `, `1. `, indented to nest) become list items. Copy puts
   both HTML and plain text on the clipboard.
 - **Opens like the Notepad**: a full-height slideout on the focused screen,
-  expandable, closed with Escape.
+  expandable, closed with Escape, or detached into a window. The bar widget
+  reopens whichever was used last. Right click opens the themed DMS menu,
+  headed by the suggestions for the issue under the pointer.
 
 The interface is in French.
 
@@ -85,6 +89,8 @@ and enables the plugin once. Then add the **Correcteur** widget to a bar.
 | Open / close                 | the bar widget, or `dms ipc proofreader toggle` |
 | Check now                    | Ctrl+Enter, or `dms ipc proofreader check` |
 | Bold / italic / underline    | Ctrl+B / Ctrl+I / Ctrl+U              |
+| Next list item               | Return or Shift+Return (on an empty item: leave the list) |
+| Window / slideout            | toolbar button, or `dms ipc proofreader popout` / `dock` |
 | Close                        | Escape                                |
 
 A niri binding:

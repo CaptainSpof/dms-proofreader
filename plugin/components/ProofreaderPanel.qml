@@ -6,22 +6,30 @@ import qs.Services
 import qs.Widgets
 import qs.DCommon.Widgets as DCommon
 
-// Slideout body. All state and the LanguageTool/translation calls live on the
-// widget (`ctl`); this file only lays them out and drives the text area.
+// Body of both the slideout and the detached window. All state and the
+// LanguageTool/translation calls live on the widget (`ctl`); this file only
+// lays them out and drives the text area.
 Item {
     id: panel
 
     required property var ctl
-    required property var slideout
+    // The slideout or the window around this panel: hide() closes it.
+    required property var host
+    property bool inPopout: false
 
     // Set while the editor is being filled from `ctl`, so that load does not
     // echo back as an edit.
     property bool loading: false
 
-    Keys.onEscapePressed: slideout.hide()
+    Keys.onEscapePressed: host.hide()
 
-    // Only one slideout is visible at a time, so the editor pulls the shared
-    // document when it is shown and pushes edits while it is the one in use.
+    RichList {
+        id: richList
+    }
+
+    // Only one editor (a slideout or the window) is visible at a time, so it
+    // pulls the shared document when it is shown and pushes edits while it is
+    // the one in use.
     function onShown() {
         ctl.loadState();
         loading = true;
@@ -98,10 +106,175 @@ Item {
     }
 
 
+    // The window calls onShown() itself; it has no `revealed` signal.
     Connections {
-        target: panel.slideout
+        target: panel.host
+        ignoreUnknownSignals: true
         function onRevealed() {
             panel.onShown();
+        }
+        function onVisibleChanged() {
+            if (!panel.host.visible)
+                contextMenu.hide();
+        }
+    }
+
+    // ── lists ──
+    // List edits rebuild the document (see RichList.qml). Assigning `text`
+    // clears the undo history; the scroll position is kept.
+    function applyHtml(html, cursor) {
+        const y = editorFlick.contentY;
+        textArea.text = html;
+        editorFlick.contentY = Math.min(y, Math.max(0, editorFlick.contentHeight - editorFlick.height));
+        textArea.cursorPosition = Math.max(0, Math.min(cursor, textArea.length));
+        textArea.forceActiveFocus();
+    }
+
+    function rawText() {
+        return textArea.getText(0, textArea.length);
+    }
+
+    // Shift+Return in a list item adds the next item. False when the cursor
+    // is not in a list, so the key keeps its usual line break.
+    function newListItem() {
+        if (textArea.selectionStart !== textArea.selectionEnd)
+            return false;
+        const r = richList.newItem(textArea.text, rawText(), textArea.cursorPosition);
+        if (!r)
+            return false;
+        applyHtml(r.html, r.cursor);
+        return true;
+    }
+
+    function toggleList() {
+        const start = textArea.selectionStart;
+        const end = textArea.selectionEnd;
+        const html = richList.toggleList(textArea.text, rawText(), start, end);
+        if (!html) {
+            ToastService.showInfo("Liste impossible ici");
+            return;
+        }
+        applyHtml(html, textArea.cursorPosition);
+        if (end > start)
+            textArea.select(start, end);
+    }
+
+    // Qt pastes HTML lists as lists already; plain text arrives as one
+    // paragraph per line, so typed bullets ("- ", "• ", "1. ") become items.
+    function paste() {
+        const from = textArea.selectionStart;
+        textArea.paste();
+        const to = textArea.cursorPosition;
+        if (to <= from)
+            return;
+        const r = richList.convertBullets(textArea.text, rawText(), from, to);
+        if (r)
+            applyHtml(r.html, to - r.removed);
+    }
+
+    // Whether the cursor sits in a list item, for the toolbar button: the
+    // export of one character next to the cursor (in the same paragraph)
+    // carries its <li>; an empty paragraph has none, so parse the document.
+    property int revision: 0
+    readonly property bool inList: {
+        revision; // a list toggle changes neither the length nor the cursor
+        const pos = textArea.cursorPosition;
+        const len = textArea.length;
+        const isBreak = p => textArea.getText(p, p + 1) === " ";
+        if (pos < len && !isBreak(pos))
+            return /<li[\s>]/.test(textArea.getFormattedText(pos, pos + 1));
+        if (pos > 0 && !isBreak(pos - 1))
+            return /<li[\s>]/.test(textArea.getFormattedText(pos - 1, pos));
+        const raw = rawText();
+        const doc = richList.load(textArea.text, raw);
+        return !!doc && doc.blocks[richList.paragraphAt(richList.paragraphStarts(raw), pos)].kind === "li";
+    }
+
+    // ── context menu ──
+    // The DMS menu, as in the Notepad, headed by the suggestions for the
+    // issue under the click.
+    function openContextMenu(pos, x, y, fromKeyboard) {
+        const hasSelection = textArea.selectedText.length > 0;
+        const items = [];
+        const i = ctl.upToDate ? ctl.matches.findIndex(m => pos >= m.offset && pos <= m.offset + m.length) : -1;
+        if (i >= 0) {
+            const m = ctl.matches[i];
+            (m.replacements || []).slice(0, 5).forEach(r => items.push({
+                        type: "item",
+                        icon: "auto_fix_high",
+                        text: r.value === "" ? "(supprimer)" : r.value,
+                        action: () => panel.applyReplacement(i, r.value)
+                    }));
+            items.push({
+                type: "item",
+                icon: "visibility_off",
+                text: "Ignorer",
+                action: () => panel.ctl.ignoreMatch(i)
+            });
+            if (m.rule?.issueType === "misspelling")
+                items.push({
+                    type: "item",
+                    icon: "library_add",
+                    text: "Ajouter au dictionnaire",
+                    action: () => panel.ctl.addToDictionary(i)
+                });
+            items.push({
+                type: "separator"
+            });
+        }
+        items.push({
+            type: "item",
+            icon: "content_cut",
+            text: "Couper",
+            enabled: hasSelection,
+            action: () => textArea.cut()
+        }, {
+            type: "item",
+            icon: "content_copy",
+            text: "Copier",
+            enabled: hasSelection,
+            action: () => textArea.copy()
+        }, {
+            type: "item",
+            icon: "content_paste",
+            text: "Coller",
+            enabled: textArea.canPaste,
+            action: () => panel.paste()
+        }, {
+            type: "item",
+            icon: "delete",
+            text: "Supprimer",
+            enabled: hasSelection,
+            action: () => textArea.remove(textArea.selectionStart, textArea.selectionEnd)
+        }, {
+            type: "separator"
+        }, {
+            type: "item",
+            icon: "format_list_bulleted",
+            text: panel.inList ? "Retirer la liste à puces" : "Liste à puces",
+            action: () => panel.toggleList()
+        }, {
+            type: "item",
+            icon: "select_all",
+            text: "Tout sélectionner",
+            enabled: textArea.length > 0,
+            action: () => textArea.selectAll()
+        });
+        contextMenu.menuItems = items;
+        contextMenu.openAtItem(panel, x, y, fromKeyboard);
+    }
+
+    property double contextMenuClosedAt: 0
+
+    DContextMenu {
+        id: contextMenu
+        keyboardNavigable: true
+        onRenderActiveChanged: {
+            if (!renderActive) {
+                panel.contextMenuClosedAt = Date.now();
+                if (panel.host.visible)
+                    Qt.callLater(() => textArea.forceActiveFocus());
+            }
         }
     }
 
@@ -217,6 +390,18 @@ Item {
                 tooltipText: "Effacer"
                 onClicked: panel.replaceAll("")
             }
+            DankActionButton {
+                visible: !panel.inPopout
+                iconName: "open_in_new"
+                tooltipText: "Ouvrir dans une fenêtre"
+                onClicked: panel.ctl.popOut()
+            }
+            DankActionButton {
+                visible: panel.inPopout
+                iconName: "dock_to_right"
+                tooltipText: "Ancrer dans le panneau latéral"
+                onClicked: panel.ctl.dock()
+            }
         }
 
         StyledText {
@@ -281,6 +466,14 @@ Item {
             }
 
             DankActionButton {
+                iconName: "format_list_bulleted"
+                tooltipText: "Liste à puces (Maj+Entrée : nouvel élément)"
+                iconColor: panel.inList ? Theme.primary : Theme.surfaceVariantText
+                backgroundColor: panel.inList ? Theme.withAlpha(Theme.primary, 0.15) : "transparent"
+                onClicked: panel.toggleList()
+            }
+
+            DankActionButton {
                 iconName: "format_clear"
                 tooltipText: "Effacer la mise en forme"
                 onClicked: panel.clearFormat()
@@ -298,6 +491,7 @@ Item {
             border.color: textArea.activeFocus ? Theme.primary : Theme.outlineVariant
 
             Flickable {
+                id: editorFlick
                 anchors.fill: parent
                 // Clear the 2px focus border so it never covers the first line.
                 anchors.margins: 2
@@ -353,6 +547,7 @@ Item {
                     }
 
                     onTextChanged: {
+                        panel.revision++;
                         segmentTimer.restart();
                         if (panel.loading)
                             return;
@@ -374,7 +569,41 @@ Item {
                             matchList.positionViewAtIndex(i, ListView.Contain);
                     }
 
+                    // Right click opens the themed DMS menu instead of Qt's own.
+                    MouseArea {
+                        property bool skipNextOpen: false
+                        anchors.fill: parent
+                        acceptedButtons: Qt.RightButton
+                        cursorShape: Qt.IBeamCursor
+                        onPressed: mouse => {
+                            skipNextOpen = contextMenu.renderActive || (Date.now() - panel.contextMenuClosedAt) < 200;
+                            mouse.accepted = true;
+                        }
+                        onClicked: mouse => {
+                            if (skipNextOpen)
+                                return;
+                            const pos = mapToItem(panel, mouse.x, mouse.y);
+                            panel.openContextMenu(textArea.positionAt(mouse.x, mouse.y), pos.x, pos.y, false);
+                        }
+                    }
+
                     Keys.onPressed: event => {
+                        if (event.key === Qt.Key_Menu || (event.key === Qt.Key_F10 && (event.modifiers & Qt.ShiftModifier))) {
+                            const rect = textArea.cursorRectangle;
+                            const pos = textArea.mapToItem(panel, rect.x, rect.y + rect.height);
+                            panel.openContextMenu(textArea.cursorPosition, pos.x, pos.y, true);
+                            event.accepted = true;
+                            return;
+                        }
+                        if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && (event.modifiers & Qt.ShiftModifier) && !(event.modifiers & Qt.ControlModifier)) {
+                            event.accepted = panel.newListItem();
+                            return;
+                        }
+                        if ((event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier)) || (event.key === Qt.Key_Insert && (event.modifiers & Qt.ShiftModifier))) {
+                            panel.paste();
+                            event.accepted = true;
+                            return;
+                        }
                         if (!(event.modifiers & Qt.ControlModifier))
                             return;
                         switch (event.key) {
